@@ -1,0 +1,111 @@
+\ Program for teaching fixed ratio
+\ in this, FR = 1, which means animal must response 1 times before reward
+\ filename: fixedratiotest.mpc
+
+\Inputs
+^CupBeam = 3
+^IR1 = 4
+^IR2 = 5
+^IR3 = 6
+^IR4 = 7
+
+\Outputs
+^Dipper = 4
+^Houselight  = 7
+
+DIM A = 10000 \sealed array
+
+\Variables
+    \A() array records length of periods in which beam is broken
+    \B ensures the IR break is not a fluke- counts number of ticks in which beam is broken. >2 ticks = Z3 activates
+    \C = counter of times animal headpokes/ beam has been broken for more than two ticks
+    \N = cup triggered by approaching it counter
+    \M = CupBeam response count
+    \W = IR1
+    \X = IR2
+    \Y = IR3
+    \Z = IR4
+    \R = number of rewards provided by foodcup approach
+
+\Z-pulses
+    \Z1 triggers the dipper to raise and provide reward if animal approaches food cup
+    \Z2
+    \Z3
+S.S.1,
+S1,
+ 1": ~ConnectToVM('RKC-MYR-WD-0004', 'Box 1');~ ---> S2
+S2,
+ 2": ~WriteEventVM('RKC-MYR-WD-0004', 'Box 1', StartSavingEvent, 'Start Video');~ ---> S3
+S3,
+ 40': ~WriteEventVM('RKC-MYR-WD-0004', 'Box 1', StopSavingEvent, 'Stop Video');~ ---> S4
+S4,
+ 1": ~DisconnectVM('RKC-MYR-WD-0004', 'Box 1');~ ---> STOPKILL
+
+S.S.2,
+S1,
+ 1": ~ConnectToVM('RKC-MYR-WD-0004', 'Box 2');~ ---> S2
+S2,
+ 2": ~WriteEventVM('RKC-MYR-WD-0004', 'Box 2', StartSavingEvent, 'Start Video');~ ---> S3
+S3,
+ 40': ~WriteEventVM('RKC-MYR-WD-0004', 'Box 2', StopSavingEvent, 'Stop Video');~ ---> S4
+S4,
+ 1": ~DisconnectVM('RKC-MYR-WD-0004', 'Box 2');~ ---> STOPKILL
+
+S.S.3,
+S1,
+ 1": ~ConnectToVM('RKC-MYR-WD-0004', 'Box 3');~ ---> S2
+S2,
+ 2": ~WriteEventVM('RKC-MYR-WD-0004', 'Box 3', StartSavingEvent, 'Start Video');~ ---> S3
+S3,
+ 40': ~WriteEventVM('RKC-MYR-WD-0004', 'Box 3', StopSavingEvent, 'Stop Video');~ ---> S4
+S4,
+ 1": ~DisconnectVM('RKC-MYR-WD-0004', 'Box 3');~ ---> STOPKILL
+
+S.S.4,
+S1,
+ 1": ~ConnectToVM('RKC-MYR-WD-0004', 'Box 4');~ ---> S2
+S2,
+ 2": ~WriteEventVM('RKC-MYR-WD-0004', 'Box 4', StartSavingEvent, 'Start Video');~ ---> S3
+S3,
+ 40': ~WriteEventVM('RKC-MYR-WD-0004', 'Box 4', StopSavingEvent, 'Stop Video');~ ---> S4
+S4,
+ 1": ~DisconnectVM('RKC-MYR-WD-0004', 'Box 4');~ ---> STOPKILL
+
+S.S.5, \Main control logic for FR
+S1,
+     #START: ON ^Houselight ---> S2 \house light is always on
+
+S2, \Dipper counter, Z-Pulse (Z1) will trigger the dipper to raise and provide reward if animal approaches the foodcup
+    1#R^CupBeam: ADD M; SHOW 1,Dipper Approached,M; Z1 ---> SX \count 1 response for every 1 approach
+
+S.S.6, \This zpulse triggers the dipper to raise and provide rewrd if the animal approaches the foodcup
+S1, \Z-Pulse acting as an input
+    #Z1: ON ^Dipper ---> S2
+S2,
+    3": OFF ^Dipper ---> S1 \Everytime a z pulse is received raise the dipper for 3 seconds; Change so that if animal stays in foodcup, Z pulse is still triggered to lift dipper
+
+S.S.7, \Track how long animal spends in foodcupbeam (hopefully)
+S1,
+    #R^CupBeam: ADD B; IF B >= 2 [@Entry, @NoEntry]
+        @Entry: SET B = 0; ADD C; Z3 ---> S2 \C counts response to cupbeam
+        @NoEntry: ---> SX
+    0.02": SET B = 0 ---> S1
+S2,
+    0.02": Z4 ---> S1
+    #R^CupBeam: ---> S2
+
+S.S.8,
+S1,
+    #START: SET A(I) = -987.987 ---> S2
+S2,     \ Wait for a signal that the input has been broken.
+
+  #Z3: SET T = 0 ---> S3
+S3,
+    0.01": SET T = T + 1 ---> S3 \change back to 0.01 mayve
+    #Z4: SET A(I) = T; ADD I; SET A(I) = -987.987 ---> S2 \set response duration to array and increment?
+
+S.S.9, \Session Timer
+S1,
+    #START: ---> S2
+S2,
+    40': ---> STOPSAVE \session is 40 mins long
